@@ -32,7 +32,7 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 6. Run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json > $S/writes.json`.
 7. `ArtifactData` `batch` on `artifactUrl`: one entry per item in `writes`: `{op:"set", collection:"workItems", doc_id: docId, data, if_version: ifVersion}`, omitting `if_version` when `ifVersion` is null. Send at most 50 per batch. If a batch fails on a version conflict, `get` the document it names. If it is now `deleted: true`, drop its write. Otherwise update its `version` in `$S/rows.json`, re-run merge (step 6) for the remaining writes, and retry once.
 8. Run `CLI ack --drafts $S/drafts.json` only after every write has succeeded or been dropped as deleted. If a batch fails, don't ack; the Pending Updates stay claimed and the next Sync retries them.
-9. Reply in one line: how many Work Items were updated and archived, plus the Worklog link.
+9. Reply in one line: how many Work Items were updated and archived, plus the Worklog link. If merge returned `archiveErrors`, name those Work Items and the message; their next Sync retries.
 
 ## Override
 

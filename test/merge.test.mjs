@@ -95,3 +95,15 @@ test('writes pin the existing row version and leave new rows unpinned', () => {
     assert.equal('id' in w.data, false);
   }
 });
+
+test('a failing archive is reported and does not stop the other drafts', () => {
+  const archive = (d) => { if (d.id === 'wi_1') throw new Error('disk full'); return '/a/ok'; };
+  const drafts = [draft({ inferredStatus: 'done' }), draft({ id: 'wi_2', inferredStatus: 'done' })];
+  const { writes, archiveErrors } = mergeAll({ drafts, rows: [], archive, now: NOW });
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].data.archivePath, null);
+  assert.equal(writes[0].data.archivedAt, null);
+  assert.equal(writes[1].data.archivePath, '/a/ok');
+  assert.deepEqual(archiveErrors, [{ id: 'wi_1', message: 'disk full' }]);
+  assert.deepEqual(mergeAll({ drafts: [draft()], archive: noArchive, now: NOW }).archiveErrors, []);
+});
