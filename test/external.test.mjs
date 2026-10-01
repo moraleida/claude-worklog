@@ -40,3 +40,9 @@ test('githubRepoFor and currentBranch use git in the given directory', () => {
   assert.equal(currentBranch('/w', exec), 'feature/a');
   assert.equal(currentBranch('/w', failing), '');
 });
+
+test('currentBranch gives git a short timeout for the prompt hook', () => {
+  let opts;
+  currentBranch('/w', (cmd, args, o) => { opts = o; return 'main\n'; });
+  assert.ok(opts.timeout <= 1500);
+});
