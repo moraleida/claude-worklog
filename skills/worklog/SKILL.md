@@ -39,7 +39,7 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 1. Run `CLI current` to get `id`, `cwd`, `branch`.
 2. Follow **Sync** steps 1–2. Then run `CLI collect --cwd <cwd> > $S/drafts.json` and write a fresh phrase only for `id`.
 3. Write `{"<id>": <override>}` to `$S/override.json` with the Write tool, then run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json --override-file $S/override.json > $S/writes.json`. Never put user text inside a shell string. Then do **Sync** step 7. No ack is needed: `--cwd` claims nothing.
-4. Confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status."
+4. If `writes` contains the current `id`, confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status." Otherwise say no Work Item matched this directory and suggest running from the Worktree root.
 
 ## New
 
