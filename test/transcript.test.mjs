@@ -54,3 +54,8 @@ test('readSessionFile records its path and tolerates unreadable files', () => {
   assert.equal(readSessionFile(file).file, file);
   assert.equal(readSessionFile('/nonexistent/x.jsonl'), null);
 });
+
+test('parseSessionLines skips JSON lines that are not objects', () => {
+  const lines = ['null', '42', '"x"', '[]', ...sessionLines({ sessionId: 's5', cwd: '/w' })];
+  assert.equal(parseSessionLines(lines).sessionId, 's5');
+});

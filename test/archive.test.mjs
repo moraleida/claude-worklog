@@ -32,3 +32,8 @@ test('archiveWorkItem writes markdown and raw jsonl per Session', () => {
   assert.deepEqual(fs.readdirSync(dir).sort(), ['s9.jsonl', 's9.md']);
   assert.equal(fs.readFileSync(path.join(dir, 's9.jsonl'), 'utf8'), fs.readFileSync(file, 'utf8'));
 });
+
+test('markdown rendering skips JSON lines that are not objects', () => {
+  const lines = ['null', '42', ...sessionLines({ sessionId: 's1', cwd: '/w', prompts: ['hello'] })];
+  assert.match(renderTranscriptMarkdown(lines, { title: 'T', sessionId: 's1' }), /hello/);
+});
