@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tierOf, displayTitle, matches, whereOf, buildView } from '../page/view-model.mjs';
+import { tierOf, displayTitle, matches, whereOf, buildView } from '../page/view-model.js';
 
 const NOW = Date.parse('2026-10-01T12:00:00Z');
 const daysAgo = (n) => new Date(NOW - n * 86_400_000).toISOString();

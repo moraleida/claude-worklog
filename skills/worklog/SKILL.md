@@ -61,8 +61,8 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 
 ## First run
 
-1. Read `page/index.html` and `page/view-model.mjs` (plugin root = this skill's base directory + `/../..`).
-2. Publish with the `Artifact` tool: `file_path` = `page/index.html`, `files` = `{"view-model.mjs": "<root>/page/view-model.mjs"}`, `capabilities` = `{"db": {}, "user": {}}`, `icon` = `list`, `description` = "Every Work Item done with Claude, where it stands, and where to find it."
+1. Read `page/index.html` and `page/view-model.js` (plugin root = this skill's base directory + `/../..`).
+2. Publish with the `Artifact` tool: `file_path` = `page/index.html`, `files` = `{"view-model.js": "<root>/page/view-model.js"}`, `capabilities` = `{"db": {}, "user": {}}`, `icon` = `list`, `description` = "Every Work Item done with Claude, where it stands, and where to find it."
 3. Run `CLI config --set artifactUrl=<url>`.
 4. If the Atlassian connector is available, call `getAccessibleAtlassianResources` and run `CLI config --set jiraBaseUrl=<site url>` for the user's site. Skip this if the connector isn't available.
 5. Do **Sync** with `collect --since 30d` in step 3.
