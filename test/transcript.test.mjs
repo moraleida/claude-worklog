@@ -59,3 +59,18 @@ test('parseSessionLines skips JSON lines that are not objects', () => {
   const lines = ['null', '42', '"x"', '[]', ...sessionLines({ sessionId: 's5', cwd: '/w' })];
   assert.equal(parseSessionLines(lines).sessionId, 's5');
 });
+
+test('gitBranch is the branch at the last user prompt, not after Closing', () => {
+  const base = { sessionId: 's6', cwd: '/w', isSidechain: false };
+  const lines = [
+    JSON.stringify({ ...base, type: 'user', gitBranch: 'feature/a', timestamp: '2026-09-01T00:00:00.000Z', message: { content: 'close it' } }),
+    JSON.stringify({ ...base, type: 'assistant', gitBranch: 'feature/a', timestamp: '2026-09-01T00:01:00.000Z', message: { content: [{ type: 'text', text: 'ok' }] } }),
+    JSON.stringify({ ...base, type: 'assistant', gitBranch: 'feature/b', timestamp: '2026-09-01T00:02:00.000Z', message: { content: [{ type: 'text', text: 'switched' }] } }),
+  ];
+  assert.equal(parseSessionLines(lines).gitBranch, 'feature/a');
+});
+
+test('gitBranch falls back to the last seen branch without a user prompt', () => {
+  const lines = [JSON.stringify({ type: 'assistant', sessionId: 's7', cwd: '/w', gitBranch: 'feature/c', timestamp: '2026-09-01T00:00:00.000Z', message: { content: [{ type: 'text', text: 'hi' }] } })];
+  assert.equal(parseSessionLines(lines).gitBranch, 'feature/c');
+});
