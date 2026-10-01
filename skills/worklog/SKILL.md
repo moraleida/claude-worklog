@@ -1,0 +1,79 @@
+---
+name: worklog
+description: Keeps the user's private Worklog artifact up to date — one row per Work Item with its Status, State Phrase and where it lives. Use for /worklog and its arguments (a status, reset, title:, new, close, backfill), when the Keeper loop fires, or when the user asks to log, close, or split off work.
+---
+
+# Worklog
+
+Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State Phrase, Status Override, Pending Update, Keeper, Archived Transcript, Closing, Drift. Use these words with the user.
+
+`CLI` below means `node "<this skill's base directory>/../../bin/worklog.mjs"`. `$S` means this session's scratchpad directory. Load `ArtifactData` with ToolSearch before its first use.
+
+## Route the arguments
+
+| Arguments | Do |
+|---|---|
+| none | **Sync** |
+| a Status (`in progress`, `blocked`, `awaiting review`, `done`, `abandoned`; hyphens allowed) | **Override** with `{"statusOverride":"<status>"}` |
+| `reset` | **Override** with `{"statusOverride":null}` |
+| `title: <text>` | **Override** with `{"titleOverride":"<text>"}` |
+| `new [description]` | **New** |
+| `close [done\|abandoned]` | **Close** |
+| `backfill <window>` | **Sync**, with `collect --since <window>` in step 3 |
+| anything else | Show this table in one line and stop |
+
+## Sync
+
+1. Run `CLI config`. If there is no `artifactUrl`, do **First run** and stop.
+2. `ArtifactData` `list` collection `workItems` on `artifactUrl`, paging until done. Write `$S/rows.json` as a JSON array whose elements are each document's fields plus `"id": <doc_id>`.
+3. Run `CLI collect --pending --recheck $S/rows.json > $S/drafts.json`.
+4. If `drafts` is empty, run `CLI ack --drafts $S/drafts.json`, say "Worklog is up to date", and stop.
+5. For every draft whose row isn't `deleted`, write one **State Phrase** from its `digest` plus `inferredStatus` and `prUrl`. Rules: at most 15 words; says where the work stands now, not what was said; no quotes from the transcript; no secrets, credentials, or client details beyond what the Title already shows. Write `$S/phrases.json` as `{ "<id>": "<phrase>" }`.
+6. Run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json > $S/writes.json`.
+7. `ArtifactData` `batch` on `artifactUrl`: one `set` per entry in `writes`, collection `workItems`, `doc_id` = `docId`, data = `data`. Send at most 50 per batch.
+8. Run `CLI ack --drafts $S/drafts.json` only after every batch has succeeded. If a batch fails, don't ack; the Pending Updates stay claimed and the next Sync retries them.
+9. Reply in one line: how many Work Items were updated and archived, plus the Worklog link.
+
+## Override
+
+1. Run `CLI current` to get `id`, `cwd`, `branch`.
+2. Follow **Sync** steps 1–2. Then run `CLI collect --cwd <cwd> > $S/drafts.json` and write a fresh phrase only for `id`.
+3. Run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json --override '{"<id>": <override>}' > $S/writes.json`, then do **Sync** step 7. No ack is needed: `--cwd` claims nothing.
+4. Confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status."
+
+## New
+
+1. Description: use the argument, or the prompt that triggered the Drift offer, word for word.
+2. Ask once: "Ticket number for this?" Accept an answer or a skip, and never ask again.
+3. Branch name: `feature/` for new behaviour, `fix/` for correcting existing behaviour. Add `<TICKET>/` if a ticket was given, then a short lowercase hyphenated description of the change. Never a username, never a placeholder.
+4. Run `orca worktree create --name <branch> --agent claude --prompt "<description>" --activate --json`. If `claude` isn't an accepted agent id, read `orca agent-context --json` for the right one.
+5. Read the new worktree's `branch` from the JSON (or `orca worktree show --worktree name:<branch> --json`). If it isn't `<branch>`, run `git -C <path> branch -m <branch>`.
+6. Tell the user in one line that the new Session is running in that Worktree, and continue the current Work Item here.
+
+## Close
+
+1. Status = the argument (`done` or `abandoned`), default `done`.
+2. If `git status --porcelain` shows uncommitted changes, stop and ask the user to commit or stash them first.
+3. Do **Override** with `{"statusOverride":"<status>"}`. Merge archives the Work Item.
+4. Ask what the next Work Item in this Worktree is, and its ticket (once, skippable). Build the branch name as in **New** step 3.
+5. Find the base with `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `origin/main`), then run `git fetch origin` and `git switch -c <branch> <base>`.
+6. Tell the user: "Closed <Title>. Run `/clear` to start the next Session on `<branch>`."
+
+## First run
+
+1. Read `page/index.html` and `page/view-model.mjs` (plugin root = this skill's base directory + `/../..`).
+2. Publish with the `Artifact` tool: `file_path` = `page/index.html`, `files` = `{"view-model.mjs": "<root>/page/view-model.mjs"}`, `capabilities` = `{"db": {}, "user": {}}`, `icon` = `list`, `description` = "Every Work Item done with Claude, where it stands, and where to find it."
+3. Run `CLI config --set artifactUrl=<url>`.
+4. If the Atlassian connector is available, call `getAccessibleAtlassianResources` and run `CLI config --set jiraBaseUrl=<site url>` for the user's site. Skip this if the connector isn't available.
+5. Do **Sync** with `collect --since 30d` in step 3.
+6. Tell the user the link, and suggest starting the Keeper (below).
+
+## Keeper
+
+The Keeper is one long-running Session in its own Orca terminal, outside any Worktree (for example in `~`), running:
+
+```
+/loop 30m /worklog
+```
+
+Each pass is a **Sync**. `/worklog` in any Session does the same thing immediately.
