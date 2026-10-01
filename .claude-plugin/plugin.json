@@ -1,7 +1,7 @@
 {
   "name": "worklog",
   "description": "Keeps a private Worklog artifact of every Work Item done with Claude: its Status, a one-phrase State, and where to find it.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "Ricardo Moraleida" },
   "license": "UNLICENSED",
   "keywords": ["worklog", "sessions", "artifact", "orca"]
