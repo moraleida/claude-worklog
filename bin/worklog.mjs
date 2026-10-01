@@ -112,7 +112,13 @@ switch (command) {
         fail(e.message);
       }
     }
-    print(collectDrafts({ mode, sinceMs, cwd: values.cwd, recheckCwds }));
+    const result = collectDrafts({ mode, sinceMs, cwd: values.cwd, recheckCwds });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const draft of result.drafts) {
+      const row = byId.get(draft.id);
+      draft.changed = !values.recheck || !row || row.lastActiveAt !== draft.lastActiveAt || row.inferredStatus !== draft.inferredStatus;
+    }
+    print(result);
     break;
   }
   case 'merge': {

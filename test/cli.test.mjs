@@ -117,3 +117,22 @@ test('a bad --since window or unknown flag fails without a stack trace', () => {
     assert.doesNotMatch(r.stderr, /\n\s+at /);
   }
 });
+
+test('collect --recheck marks only drafts that differ from their row as changed', () => {
+  const { env, root } = tmpEnv();
+  const cwd = path.join(root, 'wt');
+  fs.mkdirSync(cwd);
+  writeSession(env, cwd, 's1', sessionLines({ sessionId: 's1', cwd, branch: 'feature/r' }));
+  const first = JSON.parse(run(env, ['collect', '--cwd', cwd]).stdout).drafts[0];
+  assert.equal(first.changed, true);
+  const rowsFile = path.join(root, 'rows.json');
+  const check = (row) => {
+    fs.writeFileSync(rowsFile, JSON.stringify(row ? [row] : []));
+    return JSON.parse(run(env, ['collect', '--cwd', cwd, '--recheck', rowsFile]).stdout).drafts[0].changed;
+  };
+  const same = { id: first.id, cwd, lastActiveAt: first.lastActiveAt, inferredStatus: first.inferredStatus, status: 'in progress' };
+  assert.equal(check(same), false);
+  assert.equal(check(null), true);
+  assert.equal(check({ ...same, lastActiveAt: '2020-01-01T00:00:00.000Z' }), true);
+  assert.equal(check({ ...same, inferredStatus: 'done' }), true);
+});

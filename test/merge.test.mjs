@@ -107,3 +107,20 @@ test('a failing archive is reported and does not stop the other drafts', () => {
   assert.deepEqual(archiveErrors, [{ id: 'wi_1', message: 'disk full' }]);
   assert.deepEqual(mergeAll({ drafts: [draft()], archive: noArchive, now: NOW }).archiveErrors, []);
 });
+
+test('an unchanged recheck draft is not written; a changed or overridden one is', () => {
+  const rows = [{ id: 'wi_1', version: 2, lastActiveAt: '2026-09-30T10:00:00.000Z', inferredStatus: 'in progress' }];
+  const unchanged = mergeAll({ drafts: [draft({ changed: false })], rows, archive: noArchive, now: NOW });
+  assert.deepEqual(unchanged.writes, []);
+  assert.deepEqual(unchanged.unchanged, ['wi_1']);
+  assert.equal(mergeAll({ drafts: [draft({ changed: true })], rows, archive: noArchive, now: NOW }).writes.length, 1);
+  assert.equal(mergeAll({ drafts: [draft()], rows, archive: noArchive, now: NOW }).writes.length, 1);
+  const overridden = mergeAll({ drafts: [draft({ changed: false })], rows, overrides: { wi_1: { statusOverride: 'blocked' } }, archive: noArchive, now: NOW });
+  assert.equal(overridden.writes.length, 1);
+});
+
+test('an unchanged draft whose row needs archiving is still written', () => {
+  const rows = [{ id: 'wi_1', version: 2, statusOverride: 'done' }];
+  const { writes } = mergeAll({ drafts: [draft({ changed: false })], rows, archive: () => '/a/x', now: NOW });
+  assert.equal(writes[0].data.archivePath, '/a/x');
+});
