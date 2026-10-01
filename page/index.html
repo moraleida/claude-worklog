@@ -1,0 +1,131 @@
+<title>Worklog</title>
+<style>
+  /* Layout: one search box over three collapsible recency tiers; each Work Item is a wrapping grid row. */
+  :root {
+    --bg:#fbfaf8; --fg:#1d1c1a; --muted:#6b6862; --line:#e6e2db; --chip:#efece6; --accent:#3b5bdb;
+    --s-progress:#3b5bdb; --s-blocked:#c92a2a; --s-review:#b35c00; --s-done:#2b8a3e; --s-abandoned:#6c737a;
+    --danger:#c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#161513; --fg:#ece9e4; --muted:#a19d96; --line:#2c2a27; --chip:#24221f; --accent:#7c9bff;
+      --s-progress:#7c9bff; --s-blocked:#ff8787; --s-review:#ffa94d; --s-done:#69db7c; --s-abandoned:#adb5bd;
+      --danger:#ff8787; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#161513; --fg:#ece9e4; --muted:#a19d96; --line:#2c2a27; --chip:#24221f; --accent:#7c9bff;
+    --s-progress:#7c9bff; --s-blocked:#ff8787; --s-review:#ffa94d; --s-done:#69db7c; --s-abandoned:#adb5bd;
+    --danger:#ff8787; color-scheme: dark;
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding-block:24px 64px; padding-inline:16px; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; justify-content:space-between; }
+  h1 { margin:0; font-size:1.5rem; }
+  input[type=search] { box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--chip); color:var(--fg); font:inherit; margin-block:16px; }
+  details { border-top:1px solid var(--line); padding-block:8px; }
+  summary { cursor:pointer; font-weight:600; padding-block:6px; }
+  summary::after { content:" (" attr(data-count) ")"; font-weight:400; color:var(--muted); }
+  .rows { display:grid; gap:8px; margin-top:8px; }
+  .row { display:grid; grid-template-columns: 2fr auto 3fr auto 2fr auto; gap:12px; align-items:start; padding-block:10px; border-bottom:1px solid var(--line); }
+  .row > * { min-width:0; overflow-wrap:anywhere; }
+  @media (max-width: 720px) { .row { grid-template-columns: 1fr auto; } .row > .phrase, .row > .where { grid-column: 1 / -1; } }
+  .branch, .meta { color:var(--muted); font-size:12px; }
+  .chip { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--chip); white-space:nowrap; }
+  .chip[data-s="in progress"] { color:var(--s-progress); } .chip[data-s="blocked"] { color:var(--s-blocked); }
+  .chip[data-s="awaiting review"] { color:var(--s-review); } .chip[data-s="done"] { color:var(--s-done); } .chip[data-s="abandoned"] { color:var(--s-abandoned); }
+  button { font:inherit; font-size:12px; border:1px solid var(--line); background:transparent; color:var(--fg); border-radius:6px; padding:2px 8px; cursor:pointer; }
+  button.danger { color:var(--danger); border-color:var(--danger); }
+  button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  a { color:var(--accent); } code { font-size:12px; word-break:break-all; }
+  .notice { color:var(--muted); padding-block:24px; }
+</style>
+<main>
+  <header><h1>Worklog</h1><span class="meta" id="count"></span></header>
+  <input type="search" id="q" placeholder="Search Work Items, branches, tickets, Session IDs…" aria-label="Search the Worklog">
+  <div id="notice" class="notice">Loading your Worklog…</div>
+  <details id="week" open><summary>This week</summary><div class="rows"></div></details>
+  <details id="month"><summary>Last 30 days</summary><div class="rows"></div></details>
+  <details id="older"><summary>All time</summary><div class="rows"></div></details>
+</main>
+<script type="module">
+  import { buildView, displayTitle, whereOf } from './view-model.mjs';
+
+  let rows = [];
+  let db = null;
+  const q = document.getElementById('q');
+  const notice = document.getElementById('notice');
+  const el = (tag, attrs = {}, ...kids) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) k === 'text' ? (node.textContent = v) : node.setAttribute(k, v);
+    node.append(...kids.filter(Boolean));
+    return node;
+  };
+  const when = (iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+  function rowNode(r) {
+    const where = whereOf(r);
+    const title = el('div', {}, el('div', { text: displayTitle(r) }),
+      el('div', { class: 'branch' }, r.branch || '', r.ticket ? ' · ' : '',
+        r.ticket ? (r.ticketUrl ? el('a', { href: r.ticketUrl, target: '_blank', rel: 'noopener', text: r.ticket }) : r.ticket) : ''));
+    const sessions = el('details', { class: 'meta' }, el('summary', { text: `Sessions: ${r.sessions?.length ?? 0}` }),
+      ...(r.sessions ?? []).map((s) => el('div', {}, el('code', { text: s.id }))));
+    let whereNode;
+    if (where.kind === 'archive') {
+      whereNode = el('div', { class: 'where' }, el('div', { class: 'meta', text: 'Archived Transcript' }), el('code', { text: where.path }));
+    } else {
+      const copy = el('button', { type: 'button', text: 'Copy resume' });
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(where.resumeCommand); copy.textContent = 'Copied'; }
+        catch { copy.textContent = 'Copy failed'; }
+        setTimeout(() => (copy.textContent = 'Copy resume'), 1500);
+      });
+      whereNode = el('div', { class: 'where' }, el('div', { text: where.displayName || '' }), el('code', { text: where.path }),
+        el('div', {}, where.resumeCommand ? copy : null, where.prUrl ? el('a', { href: where.prUrl, target: '_blank', rel: 'noopener', text: ' PR' }) : null));
+    }
+    // The viewer never shows confirm(), so the button asks for a second click instead.
+    const del = el('button', { type: 'button', text: 'Delete', 'aria-label': `Delete ${displayTitle(r)} from the Worklog` });
+    let armed = null;
+    del.addEventListener('click', async () => {
+      if (!db) return;
+      if (!armed) {
+        del.textContent = 'Confirm delete (transcript stays on disk)';
+        del.classList.add('danger');
+        armed = setTimeout(() => { armed = null; del.textContent = 'Delete'; del.classList.remove('danger'); }, 5000);
+        return;
+      }
+      clearTimeout(armed);
+      try { await db.doc(`workItems/${r.id}`).update({ deleted: true, deletedAt: new Date().toISOString() }); }
+      catch (e) { armed = null; del.textContent = `Could not delete (${e?.code ?? 'error'})`; }
+    });
+    return el('div', { class: 'row' }, title, el('span', { class: 'chip', 'data-s': r.status, text: r.status }),
+      el('div', { class: 'phrase', text: r.phrase || '' }), el('div', { class: 'meta', text: when(r.lastActiveAt) }),
+      whereNode, el('div', {}, sessions, db ? del : null));
+  }
+
+  function render() {
+    const query = q.value.trim();
+    const view = buildView(rows, { query, now: Date.now() });
+    document.getElementById('count').textContent = query ? `${view.shown} of ${view.total} Work Items` : `${view.total} Work Items`;
+    for (const tier of ['week', 'month', 'older']) {
+      const section = document.getElementById(tier);
+      section.querySelector('.rows').replaceChildren(...view[tier].map(rowNode));
+      section.querySelector('summary').dataset.count = view[tier].length;
+      if (query) section.open = view[tier].length > 0;
+    }
+    notice.hidden = rows.length > 0;
+    if (!rows.length && db) notice.textContent = 'No Work Items yet. Run /worklog in Claude Code.';
+  }
+
+  q.addEventListener('input', render);
+  render();
+
+  claude.use('db').then((handle) => {
+    db = handle;
+    if (!db) { notice.textContent = 'Open this page in claude.ai, signed in, to load your Worklog.'; return; }
+    db.collection('workItems').onSnapshot(
+      (snap) => { rows = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
+      (err) => { notice.hidden = false; notice.textContent = `Could not load the Worklog (${err?.code ?? 'error'}).`; },
+    );
+  });
+</script>
