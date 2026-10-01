@@ -61,13 +61,14 @@
     node.append(...kids.filter(Boolean));
     return node;
   };
+  const isHttp = (u) => typeof u === 'string' && /^https?:\/\//.test(u);
   const when = (iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   function rowNode(r) {
     const where = whereOf(r);
     const title = el('div', {}, el('div', { text: displayTitle(r) }),
       el('div', { class: 'branch' }, r.branch || '', r.ticket ? ' · ' : '',
-        r.ticket ? (r.ticketUrl ? el('a', { href: r.ticketUrl, target: '_blank', rel: 'noopener', text: r.ticket }) : r.ticket) : ''));
+        r.ticket ? (isHttp(r.ticketUrl) ? el('a', { href: r.ticketUrl, target: '_blank', rel: 'noopener', text: r.ticket }) : r.ticket) : ''));
     const sessions = el('details', { class: 'meta' }, el('summary', { text: `Sessions: ${r.sessions?.length ?? 0}` }),
       ...(r.sessions ?? []).map((s) => el('div', {}, el('code', { text: s.id }))));
     let whereNode;
@@ -81,7 +82,7 @@
         setTimeout(() => (copy.textContent = 'Copy resume'), 1500);
       });
       whereNode = el('div', { class: 'where' }, el('div', { text: where.displayName || '' }), el('code', { text: where.path }),
-        el('div', {}, where.resumeCommand ? copy : null, where.prUrl ? el('a', { href: where.prUrl, target: '_blank', rel: 'noopener', text: ' PR' }) : null));
+        el('div', {}, where.resumeCommand ? copy : null, isHttp(where.prUrl) ? el('a', { href: where.prUrl, target: '_blank', rel: 'noopener', text: ' PR' }) : null));
     }
     // The viewer never shows confirm(), so the button asks for a second click instead.
     const del = el('button', { type: 'button', text: 'Delete', 'aria-label': `Delete ${displayTitle(r)} from the Worklog` });
@@ -127,5 +128,5 @@
       (snap) => { rows = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
       (err) => { notice.hidden = false; notice.textContent = `Could not load the Worklog (${err?.code ?? 'error'}).`; },
     );
-  });
+  }).catch((err) => { notice.hidden = false; notice.textContent = `Could not load the Worklog (${err?.code ?? 'error'}).`; });
 </script>
