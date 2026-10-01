@@ -72,3 +72,15 @@ test('buildStateCache keeps previous entries and uses the displayed title', () =
   const cache = buildStateCache([{ docId: 'wi_1', data: { title: 'Thing', titleOverride: 'Mine', phrase: 'p', status: 'blocked' } }], { wi_0: { title: 'Old' } });
   assert.deepEqual(cache, { wi_0: { title: 'Old' }, wi_1: { title: 'Mine', phrase: 'p', status: 'blocked' } });
 });
+
+test('rows never carry nested transcript text', () => {
+  const row = mergeRow(draft({
+    sessions: [{ id: 's1', lastAt: '2026-09-30T10:00:00.000Z', aiTitle: 'secret title', snippet: 'secret prompt' }],
+    where: { displayName: 'thing', path: '/w', resumeCommand: 'cd /w', note: 'secret' },
+  }), null, 'Building the CLI', NOW);
+  const rowStr = JSON.stringify(row);
+  assert(!rowStr.includes('secret title'), 'aiTitle should not leak');
+  assert(!rowStr.includes('secret prompt'), 'snippet should not leak');
+  assert(!rowStr.includes('secret'), 'where.note should not leak');
+  assert.deepEqual(row.sessions[0], { id: 's1', lastAt: '2026-09-30T10:00:00.000Z' });
+});
