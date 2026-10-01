@@ -8,7 +8,7 @@ import { archiveWorkItem } from '../lib/archive.mjs';
 import { promptHookOutput } from '../lib/drift.mjs';
 import { currentBranch } from '../lib/external.mjs';
 import { deriveTitle, workItemId } from '../lib/workitem.mjs';
-import { isFinished } from '../lib/status.mjs';
+import { isFinished, parseStatusArg } from '../lib/status.mjs';
 import { configFile, readJson, stateFile, writeJson } from '../lib/paths.mjs';
 
 const print = (data) => process.stdout.write(JSON.stringify(data, null, 2) + '\n');
@@ -16,6 +16,45 @@ const print = (data) => process.stdout.write(JSON.stringify(data, null, 2) + '\n
 function fail(message) {
   process.stderr.write(`worklog: ${message}\n`);
   process.exit(1);
+}
+
+function parseFlags(args, options) {
+  try {
+    return { values: parseArgs({ args, options }).values };
+  } catch (e) {
+    return fail(e.message);
+  }
+}
+
+function parseJsonArg(text, label) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {}
+  return fail(`${label} must be a JSON object`);
+}
+
+function readOverrides({ override, 'override-file': overrideFile }) {
+  if (overrideFile) {
+    let text;
+    try {
+      text = fs.readFileSync(overrideFile, 'utf8');
+    } catch {
+      fail(`cannot read --override-file ${overrideFile}`);
+    }
+    return checkStatuses(parseJsonArg(text, '--override-file'));
+  }
+  return override ? checkStatuses(parseJsonArg(override, '--override')) : {};
+}
+
+function checkStatuses(overrides) {
+  for (const value of Object.values(overrides)) {
+    if (value?.statusOverride == null) continue;
+    const status = parseStatusArg(value.statusOverride);
+    if (!status) fail(`invalid status "${value.statusOverride}"`);
+    value.statusOverride = status;
+  }
+  return overrides;
 }
 
 function readStdinJson() {
@@ -60,24 +99,31 @@ switch (command) {
     process.exit(0);
   }
   case 'collect': {
-    const { values } = parseArgs({ args, options: { pending: { type: 'boolean' }, since: { type: 'string' }, cwd: { type: 'string' }, recheck: { type: 'string' } } });
+    const { values } = parseFlags(args, { pending: { type: 'boolean' }, since: { type: 'string' }, cwd: { type: 'string' }, recheck: { type: 'string' } });
     const mode = values.pending ? 'pending' : values.since ? 'since' : values.cwd ? 'cwd' : null;
     if (!mode) fail('collect needs --pending, --since <window> or --cwd <path>');
     const rows = values.recheck ? readJson(values.recheck, []) : [];
     const recheckCwds = rows.filter((r) => !r.deleted && !isFinished(r.status) && r.cwd).map((r) => r.cwd);
-    const sinceMs = values.since ? Date.now() - parseDuration(values.since) : undefined;
+    let sinceMs;
+    if (values.since) {
+      try {
+        sinceMs = Date.now() - parseDuration(values.since);
+      } catch (e) {
+        fail(e.message);
+      }
+    }
     print(collectDrafts({ mode, sinceMs, cwd: values.cwd, recheckCwds }));
     break;
   }
   case 'merge': {
-    const { values } = parseArgs({ args, options: { drafts: { type: 'string' }, rows: { type: 'string' }, phrases: { type: 'string' }, override: { type: 'string' } } });
+    const { values } = parseFlags(args, { drafts: { type: 'string' }, rows: { type: 'string' }, phrases: { type: 'string' }, override: { type: 'string' }, 'override-file': { type: 'string' } });
     if (!values.drafts) fail('merge needs --drafts <file>');
     const { drafts = [] } = readJson(values.drafts, {});
     const result = mergeAll({
       drafts,
       rows: values.rows ? readJson(values.rows, []) : [],
       phrases: values.phrases ? readJson(values.phrases, {}) : {},
-      overrides: values.override ? JSON.parse(values.override) : {},
+      overrides: readOverrides(values),
       archive: (draft, row) => archiveWorkItem({ title: row.titleOverride || row.title, branch: draft.branch, cwd: draft.cwd, sessionFiles: draft.sessionFiles }),
     });
     writeJson(stateFile(), buildStateCache(result.writes, readJson(stateFile(), {})));
@@ -85,7 +131,7 @@ switch (command) {
     break;
   }
   case 'ack': {
-    const { values } = parseArgs({ args, options: { drafts: { type: 'string' } } });
+    const { values } = parseFlags(args, { drafts: { type: 'string' } });
     if (!values.drafts) fail('ack needs --drafts <file>');
     const { claimFiles = [] } = readJson(values.drafts, {});
     releaseClaims(claimFiles);
@@ -93,14 +139,14 @@ switch (command) {
     break;
   }
   case 'current': {
-    const { values } = parseArgs({ args, options: { cwd: { type: 'string' } } });
+    const { values } = parseFlags(args, { cwd: { type: 'string' } });
     const cwd = values.cwd ?? process.cwd();
     const branch = currentBranch(cwd);
     print({ id: workItemId(cwd, branch), cwd, branch, ...deriveTitle(branch, cwd) });
     break;
   }
   case 'config': {
-    const { values } = parseArgs({ args, options: { set: { type: 'string', multiple: true } } });
+    const { values } = parseFlags(args, { set: { type: 'string', multiple: true } });
     const config = readJson(configFile(), {});
     for (const pair of values.set ?? []) {
       const at = pair.indexOf('=');

@@ -67,3 +67,53 @@ test('config --set patches and prints; bad commands fail loudly', () => {
   assert.notEqual(run(env, ['collect']).status, 0);
   assert.notEqual(run(env, ['frobnicate']).status, 0);
 });
+
+function mergeFixture() {
+  const { env, root } = tmpEnv();
+  const draft = { id: 'wi_1', title: 'T', ticket: null, ticketUrl: null, branch: 'feature/x', cwd: '/w', firstActiveAt: '2026-09-28T10:00:00.000Z', lastActiveAt: '2026-09-30T10:00:00.000Z', sessions: [], sessionFiles: [], prUrl: null, inferredStatus: 'in progress', where: { displayName: null, path: '/w', resumeCommand: 'cd /w' } };
+  const draftsFile = path.join(root, 'drafts.json');
+  fs.writeFileSync(draftsFile, JSON.stringify({ drafts: [draft] }));
+  return { env, root, draftsFile };
+}
+
+test('merge --override-file applies the override', () => {
+  const { env, root, draftsFile } = mergeFixture();
+  const file = path.join(root, 'override.json');
+  fs.writeFileSync(file, JSON.stringify({ wi_1: { titleOverride: "it's \"quoted\" $(x)" } }));
+  const r = run(env, ['merge', '--drafts', draftsFile, '--override-file', file]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).writes[0].data.titleOverride, "it's \"quoted\" $(x)");
+});
+
+test('bad override JSON fails cleanly', () => {
+  const { env, root, draftsFile } = mergeFixture();
+  const file = path.join(root, 'bad.json');
+  fs.writeFileSync(file, '{nope');
+  for (const flags of [['--override-file', file], ['--override', '{nope'], ['--override-file', path.join(root, 'missing.json')]]) {
+    const r = run(env, ['merge', '--drafts', draftsFile, ...flags]);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /^worklog: /);
+    assert.doesNotMatch(r.stderr, /\n\s+at /);
+  }
+});
+
+test('a hyphenated Status Override is stored canonically and an invalid one fails', () => {
+  const { env, draftsFile } = mergeFixture();
+  const ok = run(env, ['merge', '--drafts', draftsFile, '--override', JSON.stringify({ wi_1: { statusOverride: 'awaiting-review' } })]);
+  const { data } = JSON.parse(ok.stdout).writes[0];
+  assert.equal(data.statusOverride, 'awaiting review');
+  assert.equal(data.status, 'awaiting review');
+  const bad = run(env, ['merge', '--drafts', draftsFile, '--override', JSON.stringify({ wi_1: { statusOverride: 'wip' } })]);
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /^worklog: invalid status/);
+});
+
+test('a bad --since window or unknown flag fails without a stack trace', () => {
+  const { env } = tmpEnv();
+  for (const args of [['collect', '--since', 'soon'], ['collect', '--bogus'], ['current', '--bogus'], ['ack', '--bogus']]) {
+    const r = run(env, args);
+    assert.notEqual(r.status, 0, args.join(' '));
+    assert.match(r.stderr, /^worklog: /);
+    assert.doesNotMatch(r.stderr, /\n\s+at /);
+  }
+});

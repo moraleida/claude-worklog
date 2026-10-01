@@ -38,7 +38,7 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 
 1. Run `CLI current` to get `id`, `cwd`, `branch`.
 2. Follow **Sync** steps 1–2. Then run `CLI collect --cwd <cwd> > $S/drafts.json` and write a fresh phrase only for `id`.
-3. Run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json --override '{"<id>": <override>}' > $S/writes.json`, then do **Sync** step 7. No ack is needed: `--cwd` claims nothing.
+3. Write `{"<id>": <override>}` to `$S/override.json` with the Write tool, then run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json --override-file $S/override.json > $S/writes.json`. Never put user text inside a shell string. Then do **Sync** step 7. No ack is needed: `--cwd` claims nothing.
 4. Confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status."
 
 ## New
@@ -46,7 +46,7 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 1. Description: use the argument, or the prompt that triggered the Drift offer, word for word.
 2. Ask once: "Ticket number for this?" Accept an answer or a skip, and never ask again.
 3. Branch name: `feature/` for new behaviour, `fix/` for correcting existing behaviour. Add `<TICKET>/` if a ticket was given, then a short lowercase hyphenated description of the change. Never a username, never a placeholder.
-4. Run `orca worktree create --name <branch> --agent claude --prompt "<description>" --activate --json`. If `claude` isn't an accepted agent id, read `orca agent-context --json` for the right one.
+4. Write the description to `$S/prompt.txt` with the Write tool, then run `orca worktree create --name <branch> --agent claude --prompt "$(cat "$S/prompt.txt")" --activate --json`. `<branch>` is safe to put in the command because step 3 limits it to lowercase letters, digits, hyphens, slashes and the ticket ID. If `claude` isn't an accepted agent id, read `orca agent-context --json` for the right one.
 5. Read the new worktree's `branch` from the JSON (or `orca worktree show --worktree name:<branch> --json`). If it isn't `<branch>`, run `git -C <path> branch -m <branch>`.
 6. Tell the user in one line that the new Session is running in that Worktree, and continue the current Work Item here.
 
