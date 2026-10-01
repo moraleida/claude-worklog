@@ -22,7 +22,12 @@
   main { max-width:1100px; margin:0 auto; padding-block:24px 64px; padding-inline:16px; }
   header { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; justify-content:space-between; }
   h1 { margin:0; font-size:1.5rem; }
-  input[type=search] { box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--chip); color:var(--fg); font:inherit; margin-block:16px; }
+  input[type=search] { box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--chip); color:var(--fg); font:inherit; margin-block:16px 8px; }
+  .filters { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:end; margin-block:0 16px; }
+  .filters label { display:grid; gap:2px; font-size:12px; color:var(--muted); }
+  .filters select, .filters input[type=date] { box-sizing:border-box; min-height:32px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; background:var(--chip); color:var(--fg); font:inherit; font-size:13px; }
+  .filters button { min-height:32px; }
+  @media (max-width: 720px) { .filters label { flex:1 1 140px; } .filters select, .filters input[type=date] { width:100%; } }
   main > details { border-top:1px solid var(--line); padding-block:8px; }
   main > details > summary { cursor:pointer; font-weight:600; padding-block:6px; }
   main > details > summary::after { content:" (" attr(data-count) ")"; font-weight:400; color:var(--muted); }
@@ -43,17 +48,35 @@
 <main>
   <header><h1>Worklog</h1><span class="meta" id="count"></span></header>
   <input type="search" id="q" placeholder="Search Work Items, branches, tickets, Session IDs…" aria-label="Search the Worklog">
+  <div class="filters" role="group" aria-label="Filter the Worklog">
+    <label>Status<select id="f-status">
+      <option value="">All</option><option>in progress</option><option>blocked</option>
+      <option>awaiting review</option><option>done</option><option>abandoned</option>
+    </select></label>
+    <label>Repository<select id="f-repo"><option value="">All</option></select></label>
+    <label>Active from<input type="date" id="f-from"></label>
+    <label>Active to<input type="date" id="f-to"></label>
+    <button type="button" id="f-clear" hidden>Clear filters</button>
+  </div>
   <div id="notice" class="notice">Loading your Worklog…</div>
   <details id="week" open><summary>This week</summary><div class="rows"></div></details>
   <details id="month"><summary>Last 30 days</summary><div class="rows"></div></details>
   <details id="older"><summary>All time</summary><div class="rows"></div></details>
 </main>
 <script type="module">
-  import { buildView, displayTitle, whereOf } from './view-model.js';
+  import { buildView, displayTitle, whereOf, repoOptions } from './view-model.js';
 
   let rows = [];
   let db = null;
   const q = document.getElementById('q');
+  const fStatus = document.getElementById('f-status');
+  const fRepo = document.getElementById('f-repo');
+  const fFrom = document.getElementById('f-from');
+  const fTo = document.getElementById('f-to');
+  const fClear = document.getElementById('f-clear');
+  // Date inputs give local calendar days; "to" includes its whole day.
+  const dayStart = (v) => (v ? new Date(`${v}T00:00`).getTime() : null);
+  const dayAfter = (v) => { if (!v) return null; const d = new Date(`${v}T00:00`); d.setDate(d.getDate() + 1); return d.getTime(); };
   const notice = document.getElementById('notice');
   const el = (tag, attrs = {}, ...kids) => {
     const node = document.createElement(tag);
@@ -104,28 +127,45 @@
       whereNode, el('div', {}, sessions, db ? del : null));
   }
 
+  function syncRepoOptions() {
+    const current = fRepo.value;
+    const repos = repoOptions(rows);
+    if (current && !repos.includes(current)) repos.push(current);
+    fRepo.replaceChildren(el('option', { value: '', text: 'All' }), ...repos.map((r) => el('option', { value: r, text: r })));
+    fRepo.value = current;
+  }
+
   function render() {
     const query = q.value.trim();
-    const view = buildView(rows, { query, now: Date.now() });
-    document.getElementById('count').textContent = query ? `${view.shown} of ${view.total} Work Items` : `${view.total} Work Items`;
+    const view = buildView(rows, {
+      query, now: Date.now(), status: fStatus.value, repo: fRepo.value, since: dayStart(fFrom.value), until: dayAfter(fTo.value),
+    });
+    const filtered = query || fStatus.value || fRepo.value || fFrom.value || fTo.value;
+    fClear.hidden = !filtered;
+    document.getElementById('count').textContent = filtered ? `${view.shown} of ${view.total} Work Items` : `${view.total} Work Items`;
     for (const tier of ['week', 'month', 'older']) {
       const section = document.getElementById(tier);
       section.querySelector('.rows').replaceChildren(...view[tier].map(rowNode));
       section.querySelector('summary').dataset.count = view[tier].length;
-      if (query) section.open = view[tier].length > 0;
+      if (filtered) section.open = view[tier].length > 0;
     }
     notice.hidden = rows.length > 0;
     if (!rows.length && db) notice.textContent = 'No Work Items yet. Run /worklog in Claude Code.';
   }
 
   q.addEventListener('input', render);
+  for (const f of [fStatus, fRepo, fFrom, fTo]) f.addEventListener('change', render);
+  fClear.addEventListener('click', () => {
+    q.value = fStatus.value = fRepo.value = fFrom.value = fTo.value = '';
+    render();
+  });
   render();
 
   claude.use('db').then((handle) => {
     db = handle;
     if (!db) { notice.textContent = 'Open this page in claude.ai, signed in, to load your Worklog.'; return; }
     db.collection('workItems').onSnapshot(
-      (snap) => { rows = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
+      (snap) => { rows = snap.docs.map((d) => ({ id: d.id, ...d.data() })); syncRepoOptions(); render(); },
       (err) => { notice.hidden = false; notice.textContent = `Could not load the Worklog (${err?.code ?? 'error'}).`; },
     );
   }).catch((err) => { notice.hidden = false; notice.textContent = `Could not load the Worklog (${err?.code ?? 'error'}).`; });
