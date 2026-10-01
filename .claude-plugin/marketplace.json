@@ -1,0 +1,7 @@
+{
+  "name": "worklog-local",
+  "owner": { "name": "Ricardo Moraleida" },
+  "plugins": [
+    { "name": "worklog", "source": "./", "description": "Private Worklog of Work Items done with Claude." }
+  ]
+}
