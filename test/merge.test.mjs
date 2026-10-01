@@ -84,3 +84,14 @@ test('rows never carry nested transcript text', () => {
   assert(!rowStr.includes('secret'), 'where.note should not leak');
   assert.deepEqual(row.sessions[0], { id: 's1', lastAt: '2026-09-30T10:00:00.000Z' });
 });
+
+test('writes pin the existing row version and leave new rows unpinned', () => {
+  const rows = [{ id: 'wi_1', version: 7, phrase: 'Old' }];
+  const { writes } = mergeAll({ drafts: [draft(), draft({ id: 'wi_2' })], rows, archive: noArchive, now: NOW });
+  assert.equal(writes[0].ifVersion, 7);
+  assert.equal(writes[1].ifVersion, null);
+  for (const w of writes) {
+    assert.equal('version' in w.data, false);
+    assert.equal('id' in w.data, false);
+  }
+});

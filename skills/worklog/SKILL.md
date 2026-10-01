@@ -25,13 +25,13 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 ## Sync
 
 1. Run `CLI config`. If there is no `artifactUrl`, do **First run** and stop.
-2. `ArtifactData` `list` collection `workItems` on `artifactUrl`, paging until done. Write `$S/rows.json` as a JSON array whose elements are each document's fields plus `"id": <doc_id>`.
+2. `ArtifactData` `list` collection `workItems` on `artifactUrl`, paging until done. Write `$S/rows.json` as a JSON array whose elements are `{ "id": <doc_id>, "version": <version>, ...fields }` for each document.
 3. Run `CLI collect --pending --recheck $S/rows.json > $S/drafts.json`.
 4. If `drafts` is empty, run `CLI ack --drafts $S/drafts.json`, say "Worklog is up to date", and stop.
 5. For every draft whose row isn't `deleted`, write one **State Phrase** from its `digest` plus `inferredStatus` and `prUrl`. Rules: at most 15 words; says where the work stands now, not what was said; no quotes from the transcript; no secrets, credentials, or client details beyond what the Title already shows. Write `$S/phrases.json` as `{ "<id>": "<phrase>" }`.
 6. Run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json > $S/writes.json`.
-7. `ArtifactData` `batch` on `artifactUrl`: one `set` per entry in `writes`, collection `workItems`, `doc_id` = `docId`, data = `data`. Send at most 50 per batch.
-8. Run `CLI ack --drafts $S/drafts.json` only after every batch has succeeded. If a batch fails, don't ack; the Pending Updates stay claimed and the next Sync retries them.
+7. `ArtifactData` `batch` on `artifactUrl`: one entry per item in `writes`: `{op:"set", collection:"workItems", doc_id: docId, data, if_version: ifVersion}`, omitting `if_version` when `ifVersion` is null. Send at most 50 per batch. If a batch fails on a version conflict, `get` the document it names. If it is now `deleted: true`, drop its write. Otherwise update its `version` in `$S/rows.json`, re-run merge (step 6) for the remaining writes, and retry once.
+8. Run `CLI ack --drafts $S/drafts.json` only after every write has succeeded or been dropped as deleted. If a batch fails, don't ack; the Pending Updates stay claimed and the next Sync retries them.
 9. Reply in one line: how many Work Items were updated and archived, plus the Worklog link.
 
 ## Override
