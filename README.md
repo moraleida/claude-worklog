@@ -2,6 +2,8 @@
 
 A Claude Code plugin that keeps a private Worklog artifact: one row per Work Item, with its Status, a one-phrase State, and where to find it. Vocabulary: `CONTEXT.md`. Design: `docs/superpowers/specs/2026-10-01-worklog-design.md`.
 
+![The Worklog page, showing Work Items grouped by recency with their Status, State Phrase and where to find them](docs/images/worklog.png)
+
 A Work Item is one branch in one directory. The plugin works in two setups:
 
 - **With [Orca](https://onorca.dev) (recommended).** Each Work Item gets its own Orca Worktree, so several can run side by side, and `/worklog new` opens the next one in a new Worktree with its Session already started.
