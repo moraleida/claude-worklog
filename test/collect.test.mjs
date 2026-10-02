@@ -141,7 +141,8 @@ test('in a Worktree, a missing branch never marks done and resume does not switc
     });
     assert.equal(drafts[0].inferredStatus, 'in progress');
     assert.equal(drafts[0].where.kind, worktrees.length ? 'orca' : 'worktree');
-    assert.equal(drafts[0].repo, 'r');
+    // An Orca row keeps repo unset so the page names it by its Orca workspace, as it always has.
+    assert.equal(drafts[0].repo, worktrees.length ? null : 'r');
     assert.doesNotMatch(drafts[0].where.resumeCommand, /git switch/);
   }
 });

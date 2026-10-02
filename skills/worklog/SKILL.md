@@ -48,7 +48,8 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Clone, Session, Title, Status
 3. Branch name: `feature/` for new behaviour, `fix/` for correcting existing behaviour. Add `<TICKET>/` if a ticket was given, then a short lowercase hyphenated description of the change. Never a username, never a placeholder.
 4. Write the description to `$S/prompt.txt` with the Write tool. Run `CLI current`, then:
    - `orca` is true: do **New in Orca**.
-   - `checkout.kind` is `clone` or `worktree`: do **New in place**.
+   - `checkout.kind` is `clone`: do **New in place**.
+   - `checkout.kind` is `worktree`: a Worktree holds one open Work Item at a time, so don't switch it. Offer `/worklog close` (finish the current Work Item and start the new branch here), or a new Worktree the user creates with `git worktree add` and starts `claude` in. Stop.
    - `checkout.kind` is `folder`: say this folder isn't a git repository, so its Sessions all belong to one Work Item; offer `git init` or continuing here, and stop.
 
 ### New in Orca

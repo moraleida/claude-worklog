@@ -45,7 +45,7 @@ A non-blocking hook on every prompt checks it against the open Work Item. On a d
 | `/worklog <status>` | Set a Status Override |
 | `/worklog reset` | Clear the Status Override |
 | `/worklog title: <text>` | Set the Title |
-| `/worklog new [description]` | Start a new Work Item and Session: a new Orca Worktree when Orca is installed, otherwise a new branch in place |
+| `/worklog new [description]` | Start a new Work Item and Session: a new Orca Worktree when Orca is installed, otherwise a new branch in place in a **Clone** |
 | `/worklog close [done\|abandoned]` | Close the current Work Item, cut a new branch here |
 | `/worklog backfill <window>` | Import older sessions (`90d`, `all`) |
 

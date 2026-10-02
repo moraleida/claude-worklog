@@ -12,7 +12,7 @@ claude plugin install worklog@worklog-local --scope user
 ## Start
 
 1. In any Session: `/worklog`. The first run publishes the page and imports the last 30 days.
-2. Start the Keeper in its own terminal outside any Worktree or Clone (an Orca terminal if you use Orca): `/loop 30m /worklog`. Orca is optional; without it, `/worklog new` cuts a branch in place.
+2. Start the Keeper in its own terminal outside any Worktree or Clone (an Orca terminal if you use Orca): `/loop 30m /worklog`. Orca is optional; without it, `/worklog new` cuts a new branch in a Clone.
 
 ## Local files
 
