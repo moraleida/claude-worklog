@@ -30,3 +30,9 @@ test('promptHookOutput stays silent where Drift does not apply', () => {
   assert.equal(promptHookOutput({ prompt: 'hi', cwd: '/w', branch: '', state: {} }), null);
   assert.equal(promptHookOutput({ prompt: 'hi', cwd: '/w', branch: 'feature/x', state: { [id]: { title: 'X', status: 'done' } } }), null);
 });
+
+test('driftContext does not promise a Worktree, which a Clone does not have', () => {
+  const text = driftContext({ title: 'Thing', phrase: null });
+  assert.doesNotMatch(text, /Worktree/);
+  assert.match(text, /new branch/);
+});

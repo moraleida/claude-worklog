@@ -97,3 +97,64 @@ test('recheckCwds re-reads open Work Items with no Pending Update', () => {
 test('unknown mode is rejected', () => {
   assert.throws(() => collectDrafts({ mode: 'everything', env: tmpEnv().env, exec: exec() }), /mode/);
 });
+
+const REV_PARSE = 'rev-parse --path-format=absolute --show-toplevel --git-dir --git-common-dir';
+const refsAsk = (cwd, branch) => `git -C ${cwd} for-each-ref --format=%(refname) refs/heads/${branch}`;
+
+test('in a Clone, a deleted branch reads as done and resume switches back to the branch', () => {
+  const { env, root } = tmpEnv();
+  const cwd = path.join(root, 'proj');
+  fs.mkdirSync(cwd);
+  writeSession(env, cwd, 's1', sessionLines({ sessionId: 's1', cwd, branch: 'feature/old', start: '2026-09-28T10:00:00.000Z' }));
+  writeSession(env, cwd, 's2', sessionLines({ sessionId: 's2', cwd, branch: 'feature/kept', start: '2026-09-29T10:00:00.000Z' }));
+  const { drafts } = collectDrafts({
+    mode: 'cwd', cwd, env,
+    exec: exec({
+      [`git -C ${cwd} ${REV_PARSE}`]: `${cwd}\n${cwd}/.git\n${cwd}/.git\n`,
+      [`git -C ${cwd} symbolic-ref --quiet --short HEAD`]: 'main\n',
+      [refsAsk(cwd, 'feature/old')]: '',
+      [refsAsk(cwd, 'feature/kept')]: 'refs/heads/feature/kept\n',
+    }),
+  });
+  const byBranch = Object.fromEntries(drafts.map((d) => [d.branch, d]));
+  assert.equal(byBranch['feature/old'].inferredStatus, 'done');
+  assert.equal(byBranch['feature/kept'].inferredStatus, 'in progress');
+  assert.equal(byBranch['feature/kept'].where.kind, 'clone');
+  assert.equal(byBranch['feature/kept'].repo, 'proj');
+  assert.match(byBranch['feature/kept'].where.resumeCommand, /&& git switch 'feature\/kept' && claude --resume s2$/);
+});
+
+test('in a Worktree, a missing branch never marks done and resume does not switch', () => {
+  const { env, root } = tmpEnv();
+  const cwd = path.join(root, 'wt');
+  fs.mkdirSync(cwd);
+  writeSession(env, cwd, 's1', sessionLines({ sessionId: 's1', cwd, branch: 'feature/renamed' }));
+  for (const worktrees of [[{ path: cwd, branch: 'refs/heads/feature/new-name', displayName: 'wt' }], []]) {
+    const { drafts } = collectDrafts({
+      mode: 'cwd', cwd, env,
+      exec: exec({
+        'orca worktree list --json': JSON.stringify({ result: { worktrees } }),
+        [`git -C ${cwd} ${REV_PARSE}`]: `${cwd}\n/r/.git/worktrees/wt\n/r/.git\n`,
+        [`git -C ${cwd} symbolic-ref --quiet --short HEAD`]: 'feature/new-name\n',
+        [refsAsk(cwd, 'feature/renamed')]: '',
+      }),
+    });
+    assert.equal(drafts[0].inferredStatus, 'in progress');
+    assert.equal(drafts[0].where.kind, worktrees.length ? 'orca' : 'worktree');
+    // An Orca row keeps repo unset so the page names it by its Orca workspace, as it always has.
+    assert.equal(drafts[0].repo, worktrees.length ? null : 'r');
+    assert.doesNotMatch(drafts[0].where.resumeCommand, /git switch/);
+  }
+});
+
+test('outside git, a Work Item stays in progress and resumes in place', () => {
+  const { env, root } = tmpEnv();
+  const cwd = path.join(root, 'notes');
+  fs.mkdirSync(cwd);
+  writeSession(env, cwd, 's1', sessionLines({ sessionId: 's1', cwd, branch: '' }));
+  const { drafts } = collectDrafts({ mode: 'cwd', cwd, env, exec: exec() });
+  assert.equal(drafts[0].inferredStatus, 'in progress');
+  assert.equal(drafts[0].where.kind, 'folder');
+  assert.equal(drafts[0].repo, null);
+  assert.doesNotMatch(drafts[0].where.resumeCommand, /git switch/);
+});

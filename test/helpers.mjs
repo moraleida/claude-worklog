@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { projectDirFor } from '../lib/paths.mjs';
@@ -30,4 +31,23 @@ export function writeSession(env, cwd, sessionId, lines) {
   const file = path.join(dir, `${sessionId}.jsonl`);
   fs.writeFileSync(file, lines.join('\n') + '\n');
   return file;
+}
+
+export const hasGit = (() => {
+  try {
+    execFileSync('git', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+export const git = (cwd, ...args) =>
+  execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' });
+
+export function gitRepo(dir, { branch = 'main', commit = true } = {}) {
+  fs.mkdirSync(dir, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', branch, dir]);
+  if (commit) git(dir, 'commit', '-q', '--allow-empty', '-m', 'init');
+  return fs.realpathSync(dir);
 }
