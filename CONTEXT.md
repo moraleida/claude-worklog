@@ -9,12 +9,16 @@ The single, long-lived, running record of every Work Item. Entries are never rem
 _Avoid_: report, dashboard, snapshot
 
 **Work Item**:
-One coherent piece of work, pursued across one or more Sessions, with its own Status and State Phrase. The unit of one Worklog entry.
+One coherent piece of work, pursued across one or more Sessions, with its own Status and State Phrase. The unit of one Worklog entry. Identified by its branch and the directory its Sessions run in.
 _Avoid_: task, ticket, job
 
 **Worktree**:
-An isolated working copy of a repository, managed by Orca, where Sessions run. Hosts a sequence of Work Items over time, at most one of them open at once.
+An isolated working copy of a repository where Sessions run, created by Orca or by `git worktree`. Hosts a sequence of Work Items over time, at most one of them open at once.
 _Avoid_: workspace (Orca's UI term for the same thing), checkout
+
+**Clone**:
+A repository's main working copy, used without Worktrees. Hosts many Work Items side by side, one per branch, any number of them open; only the checked-out one is being worked on.
+_Avoid_: checkout, repo
 
 **Closing**:
 Ending a Work Item's scope by the user's choice, marking it finished so its Worktree can host a new Work Item.
@@ -60,7 +64,9 @@ A local file copy of a finished Work Item's Session transcripts, referenced from
 - A **Worklog** contains many **Work Items**
 - A **Work Item** spans one or more **Sessions**
 - A **Worktree** hosts many **Work Items** in sequence, at most one open at a time
-- A **Work Item** becomes finished either by evidence (merged PR, removed **Worktree**) or by **Closing**
+- A **Clone** hosts many **Work Items**, one per branch, any number open at once
+- A directory outside any git repository holds a single **Work Item**
+- A **Work Item** becomes finished either by evidence (merged PR, removed **Worktree**, deleted branch in a **Clone**) or by **Closing**
 - The user may override a **Work Item**'s inferred **Status** at any time; a **Status Override** holds against all evidence until the user clears or replaces it
 - The user may delete a **Work Item** from the **Worklog**
 - A **Work Item** has exactly one **Status** and one **State Phrase** at any time

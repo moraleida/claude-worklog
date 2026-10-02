@@ -5,7 +5,7 @@ description: Keeps the user's private Worklog artifact up to date — one row pe
 
 # Worklog
 
-Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State Phrase, Status Override, Pending Update, Keeper, Archived Transcript, Closing, Drift. Use these words with the user.
+Vocabulary is fixed: Worklog, Work Item, Worktree, Clone, Session, Title, Status, State Phrase, Status Override, Pending Update, Keeper, Archived Transcript, Closing, Drift. Use these words with the user.
 
 `CLI` below means `node "<this skill's base directory>/../../bin/worklog.mjs"`. `$S` means this session's scratchpad directory. Load `ArtifactData` with ToolSearch before its first use.
 
@@ -39,25 +39,39 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 1. Run `CLI current` to get `id`, `cwd`, `branch`.
 2. Follow **Sync** steps 1–2. Then run `CLI collect --cwd <cwd> > $S/drafts.json` and write a fresh phrase only for `id`.
 3. Write `{"<id>": <override>}` to `$S/override.json` with the Write tool, then run `CLI merge --drafts $S/drafts.json --rows $S/rows.json --phrases $S/phrases.json --override-file $S/override.json > $S/writes.json`. Never put user text inside a shell string. Then do **Sync** step 7. No ack is needed: `--cwd` claims nothing.
-4. If `writes` contains the current `id`, confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status." Otherwise say no Work Item matched this directory and suggest running from the Worktree root.
+4. If `writes` contains the current `id`, confirm in one line, e.g. "Status Override set: blocked. `/worklog reset` returns to the inferred Status." Otherwise say no Work Item matched this directory and suggest running from the Worktree or Clone root.
 
 ## New
 
 1. Description: use the argument, or the prompt that triggered the Drift offer, word for word.
 2. Ask once: "Ticket number for this?" Accept an answer or a skip, and never ask again.
 3. Branch name: `feature/` for new behaviour, `fix/` for correcting existing behaviour. Add `<TICKET>/` if a ticket was given, then a short lowercase hyphenated description of the change. Never a username, never a placeholder.
-4. Write the description to `$S/prompt.txt` with the Write tool, then run `orca worktree create --name <branch> --agent claude --prompt "$(cat "$S/prompt.txt")" --activate --json`. `<branch>` is safe to put in the command because step 3 limits it to lowercase letters, digits, hyphens, slashes and the ticket ID. If `claude` isn't an accepted agent id, read `orca agent-context --json` for the right one.
-5. Read the new worktree's `branch` from the JSON (or `orca worktree show --worktree name:<branch> --json`). If it isn't `<branch>`, run `git -C <path> branch -m <branch>`.
-6. Tell the user in one line that the new Session is running in that Worktree, and continue the current Work Item here.
+4. Write the description to `$S/prompt.txt` with the Write tool. Run `CLI current`, then:
+   - `orca` is true: do **New in Orca**.
+   - `checkout.kind` is `clone` or `worktree`: do **New in place**.
+   - `checkout.kind` is `folder`: say this folder isn't a git repository, so its Sessions all belong to one Work Item; offer `git init` or continuing here, and stop.
+
+### New in Orca
+
+1. Run `orca worktree create --name <branch> --agent claude --prompt "$(cat "$S/prompt.txt")" --activate --json`. `<branch>` is safe to put in the command because **New** step 3 limits it to lowercase letters, digits, hyphens, slashes and the ticket ID. If `claude` isn't an accepted agent id, read `orca agent-context --json` for the right one.
+2. Read the new worktree's `branch` from the JSON (or `orca worktree show --worktree name:<branch> --json`). If it isn't `<branch>`, run `git -C <path> branch -m <branch>`.
+3. Tell the user in one line that the new Session is running in that Worktree, and continue the current Work Item here.
+
+### New in place
+
+1. If `git status --porcelain` shows uncommitted changes, stop and ask the user to commit or stash them first.
+2. Find the base with `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `origin/main`), then run `git fetch origin` and `git switch -c <branch> <base>`. With no `origin` remote, skip the fetch and use the current branch as the base.
+3. Tell the user: the previous Work Item stays open on its branch, and its Copy resume button on the Worklog switches back to it. Then: "Run `/clear` and send this to start the new Session:" followed by the contents of `$S/prompt.txt` in a fenced block.
 
 ## Close
 
-1. Status = the argument (`done` or `abandoned`), default `done`.
-2. If `git status --porcelain` shows uncommitted changes, stop and ask the user to commit or stash them first.
-3. Do **Override** with `{"statusOverride":"<status>"}`. Merge archives the Work Item.
-4. Ask what the next Work Item in this Worktree is, and its ticket (once, skippable). Build the branch name as in **New** step 3.
-5. Find the base with `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `origin/main`), then run `git fetch origin` and `git switch -c <branch> <base>`.
-6. Tell the user: "Closed <Title>. Run `/clear` to start the next Session on `<branch>`."
+1. Run `CLI current`. If `checkout.kind` is `folder`, stop: this folder isn't a git repository, so it holds one Work Item and there is no branch to cut. Suggest `/worklog done` instead, and say that later Sessions here keep adding to that Work Item.
+2. Status = the argument (`done` or `abandoned`), default `done`.
+3. If `git status --porcelain` shows uncommitted changes, stop and ask the user to commit or stash them first.
+4. Do **Override** with `{"statusOverride":"<status>"}`. Merge archives the Work Item.
+5. Ask what the next Work Item here is, and its ticket (once, skippable). Build the branch name as in **New** step 3.
+6. Find the base with `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `origin/main`), then run `git fetch origin` and `git switch -c <branch> <base>`. With no `origin` remote, skip the fetch and use the current branch as the base.
+7. Tell the user: "Closed <Title>. Run `/clear` to start the next Session on `<branch>`."
 
 ## First run
 
@@ -70,7 +84,7 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Session, Title, Status, State
 
 ## Keeper
 
-The Keeper is one long-running Session in its own Orca terminal, outside any Worktree (for example in `~`), running:
+The Keeper is one long-running Session in its own terminal (an Orca terminal if you use Orca), outside any Worktree or Clone (for example in `~`), running:
 
 ```
 /loop 30m /worklog
