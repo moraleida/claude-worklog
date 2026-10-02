@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readPending } from '../lib/pending.mjs';
 import { stateFile, readJson } from '../lib/paths.mjs';
-import { tmpEnv, sessionLines, writeSession } from './helpers.mjs';
+import { tmpEnv, sessionLines, writeSession, hasGit, gitRepo } from './helpers.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'worklog.mjs');
 const run = (env, args, input = '') => spawnSync(process.execPath, [CLI, ...args], { input, encoding: 'utf8', env: { ...process.env, ...env, PATH: '/usr/bin:/bin' } });
@@ -135,4 +135,19 @@ test('collect --recheck marks only drafts that differ from their row as changed'
   assert.equal(check(null), true);
   assert.equal(check({ ...same, lastActiveAt: '2020-01-01T00:00:00.000Z' }), true);
   assert.equal(check({ ...same, inferredStatus: 'done' }), true);
+});
+
+test('current reports a Clone, and no Orca when the orca CLI is absent', { skip: !hasGit }, () => {
+  const { env, root } = tmpEnv();
+  const repo = gitRepo(path.join(root, 'proj'), { branch: 'feature/x' });
+  const r = run(env, ['current', '--cwd', repo]);
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.branch, 'feature/x');
+  assert.equal(out.checkout.kind, 'clone');
+  assert.equal(out.checkout.repo, 'proj');
+  assert.equal(out.orca, false);
+  const plain = path.join(root, 'plain');
+  fs.mkdirSync(plain);
+  assert.equal(JSON.parse(run(env, ['current', '--cwd', plain]).stdout).checkout.kind, 'folder');
 });

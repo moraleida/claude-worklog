@@ -6,7 +6,7 @@ import { collectDrafts, parseDuration } from '../lib/collect.mjs';
 import { buildStateCache, mergeAll } from '../lib/merge.mjs';
 import { archiveWorkItem } from '../lib/archive.mjs';
 import { promptHookOutput } from '../lib/drift.mjs';
-import { currentBranch } from '../lib/external.mjs';
+import { currentBranch, describeCheckout, listOrcaWorktrees, orcaAvailable } from '../lib/external.mjs';
 import { deriveTitle, workItemId } from '../lib/workitem.mjs';
 import { isFinished, parseStatusArg } from '../lib/status.mjs';
 import { configFile, readJson, stateFile, writeJson } from '../lib/paths.mjs';
@@ -148,7 +148,7 @@ switch (command) {
     const { values } = parseFlags(args, { cwd: { type: 'string' } });
     const cwd = values.cwd ?? process.cwd();
     const branch = currentBranch(cwd);
-    print({ id: workItemId(cwd, branch), cwd, branch, ...deriveTitle(branch, cwd) });
+    print({ id: workItemId(cwd, branch), cwd, branch, ...deriveTitle(branch, cwd), checkout: describeCheckout(cwd, listOrcaWorktrees()), orca: orcaAvailable() });
     break;
   }
   case 'config': {
