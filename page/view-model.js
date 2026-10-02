@@ -20,9 +20,10 @@ export function matches(row, query) {
   return words.every((w) => haystack.includes(w));
 }
 
-// Rows carry no repository field. Orca Worktrees live at <...>/workspaces/<repo>/<worktree>,
-// so that segment names the repository; any other directory is taken to be the repository itself.
+// Sync records the repository; rows written before it did fall back to the path. Orca Worktrees live at
+// <...>/workspaces/<repo>/<worktree>, and any other directory is taken to be the repository itself.
 export function repoOf(row) {
+  if (row.repo) return row.repo;
   const parts = (row.cwd ?? row.where?.path ?? '').split('/').filter(Boolean);
   const ws = parts.lastIndexOf('workspaces');
   if (ws !== -1 && parts.length > ws + 2) return parts[ws + 1];

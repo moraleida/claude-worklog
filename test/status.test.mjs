@@ -31,3 +31,11 @@ test('parseStatusArg accepts spaced, hyphenated and cased forms', () => {
   assert.equal(parseStatusArg('blocked'), 'blocked');
   assert.equal(parseStatusArg('finished'), null);
 });
+
+test('a deleted branch means done, unless its PR is still open; unknown changes nothing', () => {
+  assert.equal(inferStatus({ prState: null, worktreeExists: true, branchExists: false }), 'done');
+  assert.equal(inferStatus({ prState: 'CLOSED', worktreeExists: true, branchExists: false }), 'done');
+  assert.equal(inferStatus({ prState: 'OPEN', worktreeExists: true, branchExists: false }), 'awaiting review');
+  assert.equal(inferStatus({ prState: null, worktreeExists: true, branchExists: null }), 'in progress');
+  assert.equal(inferStatus({ prState: null, worktreeExists: true, branchExists: true }), 'in progress');
+});

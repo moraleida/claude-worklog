@@ -124,3 +124,12 @@ test('an unchanged draft whose row needs archiving is still written', () => {
   const { writes } = mergeAll({ drafts: [draft({ changed: false })], rows, archive: () => '/a/x', now: NOW });
   assert.equal(writes[0].data.archivePath, '/a/x');
 });
+
+test('repo and checkout kind travel from draft to row', () => {
+  const row = mergeRow(draft({ repo: 'proj', where: { kind: 'clone', displayName: null, path: '/w', resumeCommand: 'cd /w' } }), null, 'x', NOW);
+  assert.equal(row.repo, 'proj');
+  assert.equal(row.where.kind, 'clone');
+  const legacy = mergeRow(draft(), null, 'x', NOW);
+  assert.equal(legacy.repo, null);
+  assert.equal(legacy.where.kind, null);
+});

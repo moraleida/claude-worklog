@@ -52,3 +52,8 @@ test('groupSessions groups by worktree and branch, oldest first', () => {
 test('resumeCommand quotes paths safely', () => {
   assert.equal(resumeCommand("/w/it's", 's1'), "cd '/w/it'\\''s' && claude --resume s1");
 });
+
+test('resumeCommand can switch to the Work Item branch first, quoted', () => {
+  assert.equal(resumeCommand('/w', 's1', { switchTo: "fix/it's" }), "cd '/w' && git switch 'fix/it'\\''s' && claude --resume s1");
+  assert.equal(resumeCommand('/w', 's1'), "cd '/w' && claude --resume s1");
+});
