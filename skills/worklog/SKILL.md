@@ -85,10 +85,8 @@ Vocabulary is fixed: Worklog, Work Item, Worktree, Clone, Session, Title, Status
 
 ## Keeper
 
-The Keeper is one long-running Session in its own terminal (an Orca terminal if you use Orca), outside any Worktree or Clone (for example in `~`), running:
+The Keeper is one long-running Session in its own terminal (an Orca terminal if you use Orca), outside any Worktree or Clone (for example in `~`). In that Session, ask Claude to schedule a recurring task that runs `/worklog:keeper` on cron `7,37 9-17 * * *`: every 30 minutes from 9am to 6pm, local time. Use `7,37 9-17 * * 1-5` for weekdays only.
 
-```
-/loop 30m /worklog
-```
+Each pass is a **Sync** run by the `keeper` skill in a forked context, so its tool output never enters the Keeper Session and the context window stays small. Don't schedule `/worklog` directly for the Keeper: every Sync's output would pile up in the Session. A scheduled task can't run `/compact` either, because built-in commands can't be scheduled and hooks can't start compaction.
 
-Each pass is a **Sync**. `/worklog` in any Session does the same thing immediately.
+Scheduled tasks live only in the Session that created them. A recurring task expires after 7 days, so recreate it once a week, or after restarting the Keeper. Tasks fire only while the Session is idle. `/worklog` in any Session does a Sync immediately.

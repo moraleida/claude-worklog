@@ -29,24 +29,28 @@ Then, in any Session, run `/worklog`. The first run publishes the Worklog page, 
 
 1. Install Orca from [onorca.dev](https://onorca.dev) and add your repositories to it.
 2. Check that the `orca` command answers in a terminal: `orca status`. The plugin uses it to name Worktrees on the page and to create new ones.
-3. Open an Orca terminal outside any Worktree (for example in `~`), start `claude`, and run the Keeper:
+3. Open an Orca terminal outside any Worktree (for example in `~`), start `claude`, and ask Claude to start the Keeper:
 
    ```
-   /loop 30m /worklog
+   schedule /worklog:keeper as a recurring task on cron 7,37 9-17 * * *
    ```
+
+   This runs a Sync every 30 minutes from 9am to 6pm. Each pass runs in a forked context, so the Keeper's context window doesn't fill up. The task expires after 7 days; recreate it weekly. See the Keeper section of `skills/worklog/SKILL.md`.
 
 ### Without Orca
 
 1. Nothing else to install. Work in a Clone of your repository as usual.
-2. Open a terminal outside any Clone (for example in `~`), start `claude`, and run the Keeper:
+2. Open a terminal outside any Clone (for example in `~`), start `claude`, and ask Claude to start the Keeper:
 
    ```
-   /loop 30m /worklog
+   schedule /worklog:keeper as a recurring task on cron 7,37 9-17 * * *
    ```
+
+   This runs a Sync every 30 minutes from 9am to 6pm. Each pass runs in a forked context, so the Keeper's context window doesn't fill up. The task expires after 7 days; recreate it weekly. See the Keeper section of `skills/worklog/SKILL.md`.
 
 ## Use
 
-The Keeper refreshes the Worklog about every 30 minutes. Everything else is a `/worklog` command in the Session you're working in:
+The Keeper refreshes the Worklog every 30 minutes during working hours. Everything else is a `/worklog` command in the Session you're working in:
 
 | Command | Effect |
 |---|---|
