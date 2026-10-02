@@ -12,7 +12,7 @@ claude plugin install worklog@worklog-local --scope user
 ## Start
 
 1. In any Session: `/worklog`. The first run publishes the page and imports the last 30 days.
-2. Start the Keeper in its own Orca terminal outside any Worktree: `/loop 30m /worklog`.
+2. Start the Keeper in its own Orca terminal outside any Worktree. Ask Claude there to schedule `/worklog:keeper` as a recurring task on cron `7,37 9-17 * * *` (every 30 minutes, 9am–6pm). Each pass runs a Sync in a forked context, so the Keeper's context window doesn't fill up. The task expires after 7 days; recreate it weekly. See the Keeper section of `skills/worklog/SKILL.md`.
 
 ## Local files
 
