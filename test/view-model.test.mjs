@@ -82,3 +82,8 @@ test('buildView filters by status, repository and last-active date range', () =>
   assert.equal(both.shown, 1);
   assert.equal(both.total, 3);
 });
+
+test('repoOf prefers the repository recorded by Sync over the path', () => {
+  assert.equal(repoOf(row({ repo: 'claude-worklog', cwd: '/o/orca/workspaces/apm/x' })), 'claude-worklog');
+  assert.equal(repoOf(row({ repo: null, cwd: '/o/orca/workspaces/apm/x' })), 'apm');
+});
